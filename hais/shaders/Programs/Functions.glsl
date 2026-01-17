@@ -4,6 +4,7 @@ mat3 tbnNormalTangent(vec3 normal, vec3 tangent) {
     return mat3(tangent, bitangent, normal);
 }
 
+
 vec3 brdf(vec3 lightDir, vec3 viewDir, float roughness, vec3 normal, vec3 albedo, float metallic, vec3 reflectance) {
     
     float alpha = pow(roughness,2);
@@ -85,21 +86,37 @@ vec3 lightingCalculations(vec3 albedo) {
     vec3 fragShadowviewSpace = (shadowModelView * vec4(fragFeetPlayerSpace,1.0)).xyz;
     vec4 fraghomogeneusSpace = shadowProjection * vec4(fragShadowviewSpace,1.0);
     vec3 fragShadowNdcSpace = fraghomogeneusSpace.xyz/fraghomogeneusSpace.w;
-    vec3 fragShadowScreenSpace = fragShadowNdcSpace* 0.5 + 0.5;
+    float distanceFromPlayerShadowNDC = length(fragShadowNdcSpace.xy);
+    vec3 distortedShadowNdcSpace = vec3(fragShadowNdcSpace.xy / ( .1+distanceFromPlayerShadowNDC), fragShadowNdcSpace.z);
+    vec3 fragShadowScreenSpace = distortedShadowNdcSpace* 0.5 + 0.5;
 
 
     //shadows
-    float shadow = step(fragShadowScreenSpace.z - .001,texture(shadowtex0,fragShadowScreenSpace.xy).r);
+    float isInShadow = step(fragShadowScreenSpace.z - .001,texture(shadowtex0,fragShadowScreenSpace.xy).r);
+    float isInNonColoredShadow = step(fragShadowScreenSpace.z - .001,texture(shadowtex1,fragShadowScreenSpace.xy).r);
+    vec3 shadowColor = texture(shadowcolor0,fragShadowScreenSpace.xy).rgb;
+
+    vec3 shadowMultiplier = vec3(1.0);
+
+    if (isInShadow == 0.0) {
+        if(isInNonColoredShadow == 0.0) {
+            shadowMultiplier = vec3(0.0);
+        } else{
+            shadowMultiplier = shadowColor;
+        }
+    }
+
+    //block and sky light
+    vec3 blockLight = pow(texture(lightmap, vec2(lightmapCoords.x, 1/32.0)).rgb,vec3(2.2));
+    vec3 skyLight = pow(texture(lightmap, vec2(1/32.0, lightmapCoords.y)).rgb,vec3(2.2));
 
 
     //ambilight
     vec3 ambientLightDirection = worldGeoNormal;
-    float ambientLight = .2* clamp(dot(ambientLightDirection, normalWorldSpace), 0.0, 1.0);
+    vec3 ambientLight = (blockLight + .2*skyLight)* clamp(dot(ambientLightDirection, normalWorldSpace), 0.0, 1.0);
 
 
     // finilized output
-    vec3 outputColor = albedo* ambientLight + shadow*brdf(shadowLightDirection, viewDir, roughness, normalWorldSpace, albedo, metallic, reflectance);
-    vec3 lightColor = pow(texture(lightmap, lightmapCoords).rgb,vec3(2.2));
-    outputColor *= lightColor;
+    vec3 outputColor = albedo* ambientLight + skyLight*shadowMultiplier*brdf(shadowLightDirection, viewDir, roughness, normalWorldSpace, albedo, metallic, reflectance);
     return outputColor;
 }

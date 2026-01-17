@@ -1,11 +1,15 @@
 #version 460
 
+ // [512 1024 2048 4096 8192]
+
 uniform sampler2D gtexture;
 uniform sampler2D lightmap;
 uniform sampler2D normals;
 uniform sampler2D specular;
 uniform sampler2D depthtex0;
 uniform sampler2D shadowtex0;
+uniform sampler2D shadowcolor0;
+uniform sampler2D shadowtex1;
 
 uniform vec3 cameraPosition;
 uniform vec3 shadowLightPosition;
@@ -28,6 +32,7 @@ in vec4 tangent;
 in vec3 viewSpacePosition;
 
 #include "/Programs/Functions.glsl"
+
 
 void main() {
     
